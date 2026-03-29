@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["fontconfig", "freetype", "liberation_ttf", "lato", "google-fonts"]
+
+[phases.build]
+cmds = ["pip install -r requirements.txt"]
+
+[start]
+cmd = "python bot.py"
