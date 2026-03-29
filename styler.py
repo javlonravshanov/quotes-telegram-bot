@@ -82,10 +82,20 @@ def _get_line_height(font, text="Ag"):
     return bbox[3] - bbox[1]
 
 
+def _get_y_for_position(position: str, content_height: int, padding: int = 100) -> int:
+    """Calculate y start position based on top/center/bottom."""
+    if position == "top":
+        return padding
+    elif position == "bottom":
+        return SIZE[1] - content_height - padding
+    else:  # center
+        return (SIZE[1] - content_height) // 2
+
+
 # ─── Style 1: Airy & Minimal ─────────────────────────────────────────────────
 # Clean photo, white text directly on image. Small context + big main quote.
 # Like img 1, 10, 11, 12, 13 from references.
-def style_airy(quote: str, photo_bytes: bytes = None, handle: str = None) -> str:
+def style_airy(quote: str, photo_bytes: bytes = None, handle: str = None, position: str = "center") -> str:
     if photo_bytes:
         img = _load_photo(photo_bytes).convert("RGBA")
     else:
@@ -119,7 +129,7 @@ def style_airy(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
     if context_text:
         total_h += 50
 
-    y = (SIZE[1] - total_h) // 2
+    y = _get_y_for_position(position, total_h)
 
     # Draw context line
     if context_text:
@@ -146,7 +156,7 @@ def style_airy(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
 # ─── Style 2: Pure Minimal ───────────────────────────────────────────────────
 # Light gray textured background, small centered serif text, lots of space.
 # Like img 3 from references.
-def style_minimal(quote: str, photo_bytes: bytes = None, handle: str = None) -> str:
+def style_minimal(quote: str, photo_bytes: bytes = None, handle: str = None, position: str = "center") -> str:
     # Create subtle paper texture
     import random as rnd
     base_color = rnd.choice([
@@ -174,7 +184,7 @@ def style_minimal(quote: str, photo_bytes: bytes = None, handle: str = None) -> 
     lines = _wrap_text(quote, font, 700)
     lh = _get_line_height(font)
     total_h = len(lines) * int(lh * 1.6)
-    y = (SIZE[1] - total_h) // 2 + 20
+    y = _get_y_for_position(position, total_h, padding=120)
 
     for i, line in enumerate(lines):
         bbox = draw.textbbox((0, 0), line, font=font)
@@ -188,7 +198,7 @@ def style_minimal(quote: str, photo_bytes: bytes = None, handle: str = None) -> 
 # ─── Style 3: Book Page / Highlight ──────────────────────────────────────────
 # Warm paper texture, text with yellow highlighter strip behind key words.
 # Like img 14 from references.
-def style_book(quote: str, photo_bytes: bytes = None, handle: str = None) -> str:
+def style_book(quote: str, photo_bytes: bytes = None, handle: str = None, position: str = "center") -> str:
     import random as rnd
     # Warm paper background
     bg = (245, 240, 228)
@@ -211,7 +221,7 @@ def style_book(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
     lh = _get_line_height(font)
     line_h = int(lh * 1.55)
     total_h = len(lines) * line_h
-    y_start = (SIZE[1] - total_h) // 2
+    y_start = _get_y_for_position(position, total_h, padding=120)
 
     highlight_colors = [(255, 242, 0, 180), (180, 255, 120, 160), (255, 210, 100, 160)]
     highlight = rnd.choice(highlight_colors)
@@ -243,7 +253,7 @@ def style_book(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
 # ─── Style 4: Dark Brand Card ─────────────────────────────────────────────────
 # Dark navy/black background, bold white sans, accent color on key words.
 # Big decorative quote mark. Optional handle. Like img 4,5,7,8,9.
-def style_dark(quote: str, photo_bytes: bytes = None, handle: str = None) -> str:
+def style_dark(quote: str, photo_bytes: bytes = None, handle: str = None, position: str = "center") -> str:
     import random as rnd
 
     palettes = [
@@ -282,7 +292,7 @@ def style_dark(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
     all_lines = _wrap_text(quote, font_main, 860)
     lh = _get_line_height(font_main)
     total_h = len(all_lines) * int(lh * 1.35)
-    y = (SIZE[1] - total_h) // 2 + 60
+    y = _get_y_for_position(position, total_h, padding=160)
 
     # Draw all lines — last line(s) in accent color
     for i, line in enumerate(all_lines):
@@ -308,7 +318,7 @@ def style_dark(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
 
 # ─── Style 5: Warm Editorial ─────────────────────────────────────────────────
 # Photo background, large bold headline + smaller subtitle. Like img 2.
-def style_warm(quote: str, photo_bytes: bytes = None, handle: str = None) -> str:
+def style_warm(quote: str, photo_bytes: bytes = None, handle: str = None, position: str = "center") -> str:
     if photo_bytes:
         img = _load_photo(photo_bytes).convert("RGBA")
         # Darken slightly for readability
@@ -350,7 +360,13 @@ def style_warm(quote: str, photo_bytes: bytes = None, handle: str = None) -> str
     lh_sub  = _get_line_height(font_sub)
 
     total_h = len(sub_lines) * int(lh_sub * 1.4) + 20 + len(main_lines) * int(lh_main * 1.2)
-    y = SIZE[1] - total_h - 100
+
+    if position == "top":
+        y = 100
+    elif position == "center":
+        y = (SIZE[1] - total_h) // 2
+    else:  # bottom (default for warm style)
+        y = SIZE[1] - total_h - 100
 
     # Sub text
     for i, line in enumerate(sub_lines):
@@ -385,6 +401,6 @@ RENDERERS = {
 }
 
 
-def render_quote(quote: str, style: str, photo_bytes: bytes = None, handle: str = None) -> str:
+def render_quote(quote: str, style: str, photo_bytes: bytes = None, handle: str = None, position: str = "center") -> str:
     renderer = RENDERERS.get(style, style_airy)
-    return renderer(quote=quote, photo_bytes=photo_bytes, handle=handle)
+    return renderer(quote=quote, photo_bytes=photo_bytes, handle=handle, position=position)

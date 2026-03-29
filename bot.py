@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 # Conversation states
 WAITING_FOR_QUOTE = 1
 WAITING_FOR_STYLE = 2
-WAITING_FOR_HANDLE = 3
+WAITING_FOR_POSITION = 3
+WAITING_FOR_HANDLE = 4
 
 STYLES = {
     "airy": "🌊 Airy & Minimal",
@@ -30,6 +31,12 @@ STYLE_KEYBOARD = InlineKeyboardMarkup([
      InlineKeyboardButton("🌑 Dark Card", callback_data="style_dark")],
     [InlineKeyboardButton("☀️ Warm Editorial", callback_data="style_warm")],
     [InlineKeyboardButton("🎲 Surprise me", callback_data="style_random")],
+])
+
+POSITION_KEYBOARD = InlineKeyboardMarkup([
+    [InlineKeyboardButton("⬆️ Top", callback_data="pos_top"),
+     InlineKeyboardButton("⬛ Center", callback_data="pos_center"),
+     InlineKeyboardButton("⬇️ Bottom", callback_data="pos_bottom")],
 ])
 
 HANDLE_KEYBOARD = InlineKeyboardMarkup([
@@ -92,8 +99,14 @@ async def handle_style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     context.user_data["style"] = style_key
 
-    # If dark card style, optionally ask for handle
-    if style_key == "dark":
+    # Ask for position next (only for photo modes, template styles auto-center)
+    if context.user_data.get("mode") == "photo":
+        await query.edit_message_text(
+            "📍 Where should the quote go?",
+            reply_markup=POSITION_KEYBOARD
+        )
+        return WAITING_FOR_POSITION
+    elif style_key == "dark":
         await query.edit_message_text(
             "Want to add your Instagram handle? Type it (e.g. @yourname) or tap below:",
             reply_markup=HANDLE_KEYBOARD
@@ -101,6 +114,27 @@ async def handle_style_choice(update: Update, context: ContextTypes.DEFAULT_TYPE
         return WAITING_FOR_HANDLE
     else:
         await query.edit_message_text(f"Generating *{STYLES[style_key]}* style... ⏳", parse_mode="Markdown")
+        await _generate_and_send(update, context, query.message.chat_id)
+        return ConversationHandler.END
+
+
+async def handle_position_choice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    position = query.data.replace("pos_", "")
+    context.user_data["position"] = position
+
+    style_key = context.user_data.get("style")
+
+    if style_key == "dark":
+        await query.edit_message_text(
+            "Want to add your Instagram handle? Type it (e.g. @yourname) or tap below:",
+            reply_markup=HANDLE_KEYBOARD
+        )
+        return WAITING_FOR_HANDLE
+    else:
+        await query.edit_message_text(f"Generating... ⏳")
         await _generate_and_send(update, context, query.message.chat_id)
         return ConversationHandler.END
 
@@ -131,6 +165,7 @@ async def _generate_and_send(update, context, chat_id):
     quote = context.user_data.get("quote", "")
     mode = context.user_data.get("mode", "template")
     handle = context.user_data.get("handle")
+    position = context.user_data.get("position", "center")
 
     photo_bytes = None
     if mode == "photo":
@@ -147,7 +182,8 @@ async def _generate_and_send(update, context, chat_id):
             quote=quote,
             style=style,
             photo_bytes=photo_bytes,
-            handle=handle
+            handle=handle,
+            position=position
         )
         with open(output_path, "rb") as f:
             await bot.send_photo(
@@ -188,6 +224,9 @@ def main():
             ],
             WAITING_FOR_STYLE: [
                 CallbackQueryHandler(handle_style_choice, pattern="^style_")
+            ],
+            WAITING_FOR_POSITION: [
+                CallbackQueryHandler(handle_position_choice, pattern="^pos_")
             ],
             WAITING_FOR_HANDLE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_handle_input),
